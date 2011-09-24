@@ -1,0 +1,131 @@
+\documentclass[magyar]{beamer}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{verbatim}
+\usepackage{beamerthemeboxes}
+\PassOptionsToPackage{normalem}{ulem}
+\usepackage{ulem}
+\usetheme{Madrid}
+\usepackage{tikz} 
+\usetikzlibrary{shapes}
+
+\makeatother
+
+\usepackage{babel}
+
+\defbeamertemplate*{footline}{mytheme}
+{
+  \leavevmode%
+  \hbox{%
+  \begin{beamercolorbox}[wd=.5\paperwidth,ht=2.25ex,dp=1ex,center]{author in head/foot}%
+	    \usebeamerfont{author in head/foot}{Nagy Zoltán Arnold}~~
+  \end{beamercolorbox}%
+  \begin{beamercolorbox}[wd=.5\paperwidth,ht=2.25ex,dp=1ex,right]{date in head/foot}%
+    \usebeamerfont{date in head/foot}{Szabad Szoftver Konferencia 2011}\hspace*{2em}
+    \insertframenumber{} / \inserttotalframenumber\hspace*{2ex}
+  \end{beamercolorbox}}%
+  \vskip0pt%
+}
+\usebeamertemplate{mytheme}
+\begin{document}
+
+\title{NPF: A NetBSD új tűzfala}
+\author{Nagy Zoltán Arnold \\ The NetBSD Foundation \\ zoltan@netbsd.org}
+\maketitle
+
+\begin{frame}
+\frametitle{Google Summer of Code}
+\begin{itemize}
+	\item A cél a szabad szoftverek támogatása
+	\item Idén 7 éves a program
+	\item Nyitott minden egyetemi hallgató számára
+	\item A NetBSD minden évben ott volt, idén 9 projekt
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\frametitle{Tűzfalkörkép}
+\begin{itemize}
+	\item IPFilter
+	\item ipfw
+	\item pf
+	\item npf
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\frametitle{Az NPF-ről}
+\begin{itemize}
+	\item A NetBSD Foundation által szponzorált projekt
+	\item Az eredeti kódot Mindaugas Rasiukevicius (rmind@) írta
+	\item Idén kiegészítettem illetve bekapcsolódtam a fejlesztésbe
+	\item A NetBSD 6.0 -ban lesz széles körben elérhető
+	\item Az első állomás a NetBSD hálózati kódjának javításában
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\frametitle{Motiváció és célok}
+\begin{itemize}
+	\item A mostani tűzfalkódok többségét tervezés nélkül bővítették
+	\item A mi tervezési céljaink:
+	\begin{itemize}
+		\item minél inkább lockless kód
+		\item ebből adódó SMP skálázódás
+		\item állapottartó szűrés
+		\item modularitás és bővíthetőség
+		\item általános bytecode motor
+	\end{itemize}
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\frametitle{Mit tud jelenleg?}
+\begin{itemize}
+	\item Tetszőleges definíciók (ext\_if = "wm0")
+	\item Csoportok (group (name "external", interface \textdollar ext\_if)
+	\item Rule procedures (csomagtranszformációk egy kapcsolatra)
+	\begin{itemize}
+		\item IP ID randomizálás
+		\item TCP minimum TTL betartatás
+		\item TCP Maximum Segment Size (MSS) betartatás
+		\item Loggolás
+	\end{itemize}
+	\item Tábla támogatás
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\frametitle{Belülről}
+N-code engine:
+\begin{itemize}
+	\item Általános célú bytecode engine, 32-bit minden szó, 4 regiszter
+	\item A tűzfalszabályok erre a bytecodera fordulnak le
+	\item CISC és RISC szerű utasítások
+	\item Maga a csomag nem kerül értelmezésre, csak mint bytefolyam
+\end{itemize}
+Okos ábrázolási módok
+\begin{itemize}
+	\item in6\_addr (128-bit) a címekhez (első 32 bit ha IPv4)
+	\item uint8\_t a maszkokhoz
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\frametitle{Fejlesztési célok}
+\begin{itemize}
+	\item Piros-fekete fa -> Radix fa a táblákhoz
+	\item Maszkokat előre legenerálni
+	\item Szabályonkénti statisztikák támogatása
+	\item Dinamikus interfészkövetés
+	\item Plugin támogatás bevezetése
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\begin{center}
+Kérdések?
+\end{center}
+\end{frame}
+
+\end{document}
