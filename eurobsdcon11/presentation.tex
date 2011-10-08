@@ -56,9 +56,9 @@
 \frametitle{A see of firewalls}
 \begin{itemize}
 	\item IPFilter (ipf)
-	\item ipfw
-	\item pf
-	\item npf
+	\item FreeBSD's ipfw
+	\item OpenBSD's pf
+	\item NetBSD's npf
 \end{itemize}
 \end{frame}
 
@@ -77,9 +77,24 @@
 \begin{frame}
 \frametitle{Google Summer of Code}
 \begin{itemize}
-	\item The program's goal is to promote open-source software development among students and get them actually involved
+	\item Goal: The program's goal is to promote open-isource software development among students and get them actually involved
+\pause
+	\item Mentoring organizations apply with a set of proposed projects
+\pause
+	\item Students apply for organizations with a proposal based either on a proposed project or a new one
+\pause
+	\item Organizations get a number of slots for students
+\pause
+	\item Mentoring organizations get \textdollar500 per student, students get \textdollar5000
+\pause
 	\item It has been running since 2005
+		\begin{itemize}
+			\item 2011: 175 mentoring organizations, 1115 students
+		\end{itemize}
 	\item NetBSD has participated every year so far with a high success rate
+		\begin{itemize}
+			\item 2011: 9 projects, 8 projects ended with success
+		\end{itemize}
 	\item My GSoC proposal for 2011 was to add IPv6 support to NPF
 		\begin{itemize}
 			\item currently not in -current (soon!)
@@ -92,6 +107,7 @@
 \frametitle{Motivations and goals}
 \begin{itemize}
 	\item There a few existing firewalls
+	\item It's easier to design a new firewall from ground up than to clean up existing codebases
 	\item Design goals for NPF:
 	\begin{itemize}
 		\item MP-safety and locklessness for scalable MP performance
@@ -100,6 +116,7 @@
 		\item N-Code processor, a general bytecode engine
 		\item Keep configuration syntax changes to a minimum
 		\item Modularity, extensibility: an extension API for developers, hooking support
+		\item Last but not least: simplicity
 	\end{itemize}
 	\item Of course it's portable, uses pfil(9) hooks; DragonFlyBSD is considering adoption 
 \end{itemize}
@@ -121,28 +138,26 @@
 \end{itemize}
 \end{frame}
 
-\begin{frame}{fragile,basicstyle=\ttfamily}
-\frametitle{Groups}
-% interface + direction
-% if no group match -> goes to default group
-\begin{semiverbatim}
-ext\_if = "wm0" \newline
-ext\_if = "wm1" \newline
+\begin{frame}[fragile,basicstyle=\ttfamily]
+\begin{verbatim}
+ext_if = "wm0"
+ext_if = "wm1"
 table "1" type "tree" dynamic
-\newline
-procedure "rid" \{ normalize (random-id) \} \newline
-procedure "log" \{ log npflog0 \} \newline
-group ( name "external", interface \textdollar ext\_if) \{ \newline
-	block in quick from <1> \newline
-	pass out quick from \textdollar ext\_if) keep state apply "rid"
-	pass in quick proto tcp to \textdollar ext\_if port ssh apply "log" \newline
-       ...\newline
-\} \newline
-group (name "internal", interface \textdollar int\_if) \{ \newline
-   ...\newline
-\} \newline
-group (default) \{ block all \}
-\end{semiverbatim}
+procedure "rid" { normalize (random-id) }
+procedure "log" { log npflog0 }
+group (name "external", interface $ext_if) {
+    block in quick from <1>
+    pass out quick from $ext_if keep state apply "rid"
+    pass in quick proto tcp to $ext_if port ssh apply "log"
+    ...
+}
+group (name "internal", interface $int_if) {
+    block in all
+    pass in quick from <1>
+    pass out quick all
+}
+group (default) { block all }
+\end{verbatim}
 \end{frame}
 
 \begin{frame}
@@ -150,7 +165,7 @@ group (default) \{ block all \}
 N-code engine:
 \begin{itemize}
 	\item General purpose bytecode engine, 32-bit words, 4 registers available
-	\item The firewall configuration is compiled to our bytecode format
+	\item The firewall configuration is compiled to our bytecode format, then loaded
 	\item CISC and RISC-like instructions
 	\item The packets are processed as a byte-stream
 \end{itemize}
