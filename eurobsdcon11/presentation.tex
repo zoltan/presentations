@@ -1,0 +1,206 @@
+\documentclass[magyar]{beamer}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{verbatim}
+\usepackage{beamerthemeboxes}
+\PassOptionsToPackage{normalem}{ulem}
+\usepackage{ulem}
+\usetheme{Madrid}
+\usepackage{tikz} 
+\usetikzlibrary{shapes}
+
+\makeatother
+
+\usepackage{babel}
+
+\defbeamertemplate*{footline}{mytheme}
+{
+  \leavevmode%
+  \hbox{%
+  \begin{beamercolorbox}[wd=.5\paperwidth,ht=2.25ex,dp=1ex,center]{author in head/foot}%
+	    \usebeamerfont{author in head/foot}{Nagy Zoltán Arnold}~~
+  \end{beamercolorbox}%
+  \begin{beamercolorbox}[wd=.5\paperwidth,ht=2.25ex,dp=1ex,right]{date in head/foot}%
+    \usebeamerfont{date in head/foot}{EuroBSDCon 2011}\hspace*{2em}
+    \insertframenumber{} / \inserttotalframenumber\hspace*{2ex}
+  \end{beamercolorbox}}%
+  \vskip0pt%
+}
+
+\usebeamertemplate{mytheme}
+\date{}
+\begin{document}
+
+\title{NPF: a new packet filter}
+\author{Zoltán Arnold Nagy\\ Mindaugas Rasiukevicius \\ The NetBSD Foundation \\ \{zoltan,rmind\}@netbsd.org}
+\maketitle
+
+\begin{frame}
+\begin{itemize}
+	\item What is a packet filter?
+\pause
+	\begin{itemize}
+		\item A boolean valued function ($f:\mathbb{P} \rightarrow \mathbb{B}$)
+	\end{itemize}
+\pause
+	\item How can it be implemented?
+\pause
+	\begin{itemize}
+		\item boolean expression tree
+		\item directed acyclic control flow graph
+	\end{itemize}
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\frametitle{A see of firewalls}
+\begin{itemize}
+	\item IPFilter (ipf)
+	\item ipfw
+	\item pf
+	\item npf
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\frametitle{How NPF started out}
+\begin{itemize}
+	\item Sponsored by The NetBSD Foundation
+	\item Written by Mindaugas Rasiukevicius (rmind@) from scratch, altought the design was inspired by the Berkeley Packet Filter
+	\item First imported to -current in August 2010
+	\item Will be widely available with the 6.0 release
+	\item First step in improving NetBSD's networking capabilities
+	\item Second step: removing the big kernel lock (proposal deadline: Oct 31st)
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\frametitle{Google Summer of Code}
+\begin{itemize}
+	\item The program's goal is to promote open-source software development among students and get them actually involved
+	\item It has been running since 2005
+	\item NetBSD has participated every year so far with a high success rate
+	\item My GSoC proposal for 2011 was to add IPv6 support to NPF
+		\begin{itemize}
+			\item currently not in -current (soon!)
+			\item available from \url{https://github.com/zoltan/ipv6-npf}
+		\end{itemize}
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\frametitle{Motivations and goals}
+\begin{itemize}
+	\item There a few existing firewalls
+	\item Design goals for NPF:
+	\begin{itemize}
+		\item MP-safety and locklessness for scalable MP performance
+		\item Fast tree- and hash-based lookup support for tables
+		\item Stateful packet filtering
+		\item N-Code processor, a general bytecode engine
+		\item Keep configuration syntax changes to a minimum
+		\item Modularity, extensibility: an extension API for developers, hooking support
+	\end{itemize}
+	\item Of course it's portable, uses pfil(9) hooks; DragonFlyBSD is considering adoption 
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\frametitle{What can it do today?}
+\begin{itemize}
+	\item Syntax is nearly identical to other firewalls
+	\item Group support
+	\item Rule procedures (connection-based packet transformations)
+	\begin{itemize}
+		\item IP ID randomization
+		\item enforcement of TCP minimum TTL
+		\item enforcement of TCP Maximum Segment Size (MSS)
+		\item logging
+	\end{itemize}
+	\item Tables support
+\end{itemize}
+\end{frame}
+
+\begin{frame}{fragile,basicstyle=\ttfamily}
+\frametitle{Groups}
+% interface + direction
+% if no group match -> goes to default group
+\begin{semiverbatim}
+ext\_if = "wm0" \newline
+ext\_if = "wm1" \newline
+table "1" type "tree" dynamic
+\newline
+procedure "rid" \{ normalize (random-id) \} \newline
+procedure "log" \{ log npflog0 \} \newline
+group ( name "external", interface \textdollar ext\_if) \{ \newline
+	block in quick from <1> \newline
+	pass out quick from \textdollar ext\_if) keep state apply "rid"
+	pass in quick proto tcp to \textdollar ext\_if port ssh apply "log" \newline
+       ...\newline
+\} \newline
+group (name "internal", interface \textdollar int\_if) \{ \newline
+   ...\newline
+\} \newline
+group (default) \{ block all \}
+\end{semiverbatim}
+\end{frame}
+
+\begin{frame}
+\frametitle{Inside}
+N-code engine:
+\begin{itemize}
+	\item General purpose bytecode engine, 32-bit words, 4 registers available
+	\item The firewall configuration is compiled to our bytecode format
+	\item CISC and RISC-like instructions
+	\item The packets are processed as a byte-stream
+\end{itemize}
+Efficient internal structures
+\begin{itemize}
+	\item npf\_addr (in6\_addr, 128-bit) for addresses (the first 32 bit is used for IPv4 addresses)
+	\item uint8\_t for masks
+	\begin{itemize}
+		\item instead of generating the appropriate npf\_addr value from  255.255.255.0 or /24, we just store
+the mask (<=128)
+		\item tradeoff: CPU for memory
+	\end{itemize}
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\frametitle{Current TODO list}
+\begin{itemize}
+	\item Replace red-black trees with Patricia (radix) trees for tables
+\pause
+	\item Pregenerate an array for masks
+\pause
+	\item Support per-rule statistics
+\pause
+	\item Multiple address per interface support on interface-based rules
+	\item Dynamic interface tracking
+		\begin{itemize}
+			\item Let's say you have a rule based on an interface instead of an address...
+			\item ...you compile and load the rules...
+			\item ...then change the interface's address?
+		\end{itemize}
+	\item Control fragmentation on a per-interface basis
+\pause
+	\item Stateful NAT64 [RFC 6146]
+	\item IPv6-to-IPv6 Network Prefix Translation (NPTv6) [RFC 6296]
+\pause
+	\item Write more documentation :)
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\begin{center}
+Questions and answers?
+\end{center}
+\end{frame}
+
+\begin{frame}
+\begin{center}
+Thank you!
+\end{center}
+\end{frame}
+
+\end{document}
