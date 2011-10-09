@@ -8,7 +8,6 @@
 \usetheme{Madrid}
 \usepackage{tikz} 
 \usetikzlibrary{shapes}
-
 \makeatother
 
 \usepackage{babel}
@@ -48,6 +47,7 @@
 	\begin{itemize}
 		\item boolean expression tree
 		\item directed acyclic control flow graph
+		\item if-then-else hell
 	\end{itemize}
 \end{itemize}
 \end{frame}
@@ -119,13 +119,26 @@
 		\item Last but not least: simplicity
 	\end{itemize}
 	\item Of course it's portable, uses pfil(9) hooks; DragonFlyBSD is considering adoption 
+	\item Please keep in mind: it's a moving target currently
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\frametitle{Usage}
+\begin{itemize}
+	\item \texttt{npfctl} can be used to communicate with /dev/npf via ioctls
+		\begin{itemize}
+			\item start, stop, reload, flush, stats, tables, sessions, ...
+		\end{itemize}
+	\item Rules will be compiled to a bytecode, and it will be loaded as ruleset(s)
+	\item Current parser will be replaced by a new one by Martin
 \end{itemize}
 \end{frame}
 
 \begin{frame}
 \frametitle{What can it do today?}
 \begin{itemize}
-	\item Syntax is nearly identical to other firewalls
+	\item Rule syntax is nearly identical to other firewalls
 	\item Group support
 	\item Rule procedures (connection-based packet transformations)
 	\begin{itemize}
@@ -135,6 +148,7 @@
 		\item logging
 	\end{itemize}
 	\item Tables support
+	\item Application-level gateways (ALGs)
 \end{itemize}
 \end{frame}
 
@@ -181,6 +195,37 @@ the mask (<=128)
 \end{itemize}
 \end{frame}
 
+\begin{frame}[fragile]
+\frametitle{Inside}
+Let's see what we can work with...
+{\tiny
+\begin{verbatim}
+typedef struct {
+        /* Information flags. */
+        uint32_t                npc_info;
+        /* Pointers to the IP v4/v6 addresses. */
+        npf_addr_t *            npc_srcip;
+        npf_addr_t *            npc_dstip;
+        /* Size (v4 or v6) of IP addresses. */
+        int                     npc_ipsz;
+        size_t                  npc_hlen;
+        int                     npc_next_proto;
+        /* IPv4, IPv6. */
+        union {
+                struct ip       v4;
+                struct ip6_hdr  v6;
+        } npc_ip;
+        /* TCP, UDP, ICMP. */
+        union {
+                struct tcphdr   tcp;
+                struct udphdr   udp;
+                struct icmp     icmp;
+        } npc_l4;
+} npf_cache_t;
+\end{verbatim}
+}
+\end{frame}
+
 \begin{frame}
 \frametitle{Current TODO list}
 \begin{itemize}
@@ -203,6 +248,18 @@ the mask (<=128)
 	\item IPv6-to-IPv6 Network Prefix Translation (NPTv6) [RFC 6296]
 \pause
 	\item Write more documentation :)
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\frametitle{What we haven't covered today and why...}
+\begin{itemize}
+	\item Performance testing
+		\begin{itemize}
+			\item No point in in-place testing, since the locking of the network stack if not fine-grained enough
+			\item Will do userspace tests once the current codebase is merged
+		\end{itemize}
+	\item Packet sniffing
 \end{itemize}
 \end{frame}
 
