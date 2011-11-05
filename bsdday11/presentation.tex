@@ -127,10 +127,7 @@ November 5, 2011}
 			\item 2011: 9 projects, 8 projects ended with success
 		\end{itemize}
 	\item My GSoC proposal for 2011 was to add IPv6 support to NPF
-		\begin{itemize}
-			\item currently not in -current (soon!)
-			\item available from \\ \url{https://github.com/zoltan/ipv6-npf}
-		\end{itemize}
+	\item ...was finally committed yesterday around 2 AM :)
 \end{itemize}
 \end{frame}
 
@@ -217,10 +214,10 @@ N-code engine:
 Efficient internal structures
 \begin{itemize}
 	\item npf\_addr (in6\_addr, 128-bit) for addresses (the first 32 bit is used for IPv4 addresses)
-	\item uint8\_t for masks
+	\item uint\_fast8\_t for masks
 	\begin{itemize}
 		\item instead of generating the appropriate npf\_addr value from  255.255.255.0 or /24, we just store
-the mask (<=128)
+the mask as a number
 		\item tradeoff: CPU for memory
 	\end{itemize}
 \end{itemize}
