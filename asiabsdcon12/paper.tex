@@ -1,0 +1,179 @@
+\documentclass[11pt,twocolumn]{article}
+\usepackage{url,listings,mdwlist}
+\usepackage{amsmath, amssymb}
+\usepackage{pgf}
+\usepackage{tikz}
+\usetikzlibrary{arrows,fit,automata,shapes.multipart,petri}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{moreverb}
+\usepackage[utf8]{inputenc}
+\usepackage[english]{babel}
+
+\usepackage{listings}
+
+\begin{document}
+\title{NPF: NetBSD's new firewall}
+\author{Zoltán Arnold Nagy \\ The NetBSD Foundation \\ zoltan@netbsd.org}
+\date{}
+
+\maketitle
+
+\begin{abstract}
+In today multicore world, bandwidth requirements continue to rise. In order to cope
+with this, there was a need for a firewall which was designed with SMP in mind and embracing
+concurreny. NPF is this firewall. While it's not as feature-heavy as other firewall
+implementations available, with it's from scratch design it brings scalability to the table.
+It will debut in NetBSD 6.0.
+\end{abstract}
+
+\section{Background}
+\subsection{Motivation}
+If we look around the market today, multicore processors are everywhere; from 12-core
+high-end server CPUs to dual-core cellphones, it's been very hard to not bump into them.
+Along with this, datacenter's bandwidth requirements are staggering - as more and more people
+start to enjoy online streaming, IPTv, Video on Demand services, we're saturating hundreds
+of gigabits of bandwidth. However, in order to build secure networks we need firewalls, and
+thus in turn, these firewalls need to handle these bandwidth requirements.
+So far NetBSD distributed two packet filters - IPFilter and PF -, but we realized they lack
+a number of features, which are the following:
+\begin{itemize}
+	\item Multicore design
+	\item Concurrent algorithms
+	\item Fast ruleset manipulation
+\end{itemize}
+
+\subsection{History overview}
+On 12 September, 2010 NPF has been announced \cite{npf_announce}. It has been written by Mindaugas Rasiukevicius
+from scratch, and was sponspored by The NetBSD Foundation. The main reason for funding the
+development of a packet filter was to improve NetBSD's network capabilities, and keeping
+in mind the importance of SMP systems, it was a logical step. During the 2011 Google
+Summer of Code \cite{gsoc}, IPv6 support has been added. \cite{ipv6_proposal}
+
+\section{Design}
+Inspired by the Berkeley Packet Filter (BPF) \cite{BPF}, NPF uses "n-code" to describe the filtering ruleset.
+Each rule is compiled into a low-level machine code, which is then in turn interpreted, and evaluated.
+This low-level machine code essentially represents a directed acyclic control flow graph. Packet inspection
+is done arithemtically (meaning the interpreted bytecode does not depend on the packets themselves; it doesn't
+matter what kind of packet is currently being processed, the bytecode ran against it will be always the same,
+except for the control instructions, which manipulate flow). All processing is done in 32-bit words (including
+instructions and their arguments).
+The two main extension points are rule procedures, which are designed to perform custom actions
+on packets, and can be implemented in a kernel module by registering it's procedure handler, and
+Application Level Gateways (ALGs), which allow application-driven dynamic firewall configurations
+(such as SIP/RTSP connection tracking).
+\subsection{Instruction set}
+The n-code bytecode interpreter supports both RISC and CISC like instructions. \cite{instr}
+\subsubsection{Fixed length instructions}
+\begin{itemize}
+	\item Flow-control instructions are: return, advance, jump, tag and invalidate
+	\item Set and load instructions are move and load word (lw)
+	\item Comparison instructions
+	\item Arithmetic instructions are add, sub, multiply and divide
+	\item Bitwise instructions are: not, and, or and xor
+\end{itemize}
+\subsubsection{Variable length instructions}
+While in general the bytecode engine avoids internal protocol knowledge, the instructions
+supporting the rulesets do use protocol knowledge in order to perform their checks. They
+are supposed to be fully optimized.
+\begin{itemize}
+	\item IP4MASK/IP6MASK are used to check the packet's IP address against
+an other masked IP address; the whole bytecode fragment consists of 4/7 words respectively: the opcode, the
+direction, the address and the netmask
+	\item TABLE is used to match the specified address against a table; the whole bytecode
+fragment consists of 3 words: the opcode, the destination and the table id
+	\item ICMP4 is used to match ICMP type and code; the whole fragment consists of 2 words:
+the opcode, and the 8-bit type and 8-bit fit together into a 32-bit word
+	\item TCP\_PORTS/UDP\_PORTS is used to match TCP/UDP ports; it consists of 3 words: opcode,
+direction and port range encoded into a 32-bit word.
+	\item TCP\_FLAGS is used to match TCP flags/mask; the whole fragment consists of 2 words:
+the opcode and the flag and the mask together in a 32-bit word
+\end{itemize}
+
+\section{Usage}
+The configuration syntax for NPF is very similiar to PF/IPFilter syntax. Generally, the configuration
+resides in /etc/npf.conf, while NPF can be controller by the npfctl(8) utilty.
+\subsection{Basics}
+In NPF, each rule must belong to a group, and there's always at least
+one group, called the default.
+
+Let's have a look at an example:
+\begin{verbatimtab}[8]
+ext_if = "wm0"
+int_if = "wm1"
+
+group (name "ext", interface $ext_if) {
+	pass all
+}
+
+group (name "int", interface $int_if) {
+	pass all
+}
+
+group (default) {
+	block all
+}
+\end{verbatimtab}
+First, we define two variables, and give them two interface names. Then
+we define two groups - the first to match packets that pass the interface defined
+in the ext\_if variable, and a second one to do the same with int\_if. If a packet
+arrives that matches either of the groups, it will get inspected by the associated group; else,
+the default group's rules apply.
+\subsection{Tables}
+Frequently changing the configuration and reloading the configuration all the time can be an expensive
+task. Also, if you have the same rule listed many times just with different IP addresses, it can be inefficient
+to evaluate. To solve this problem, NPF supports the creation of tables. A table can be backed up either by a
+Patricia tree or by a hash. Example use:
+\begin{verbatimtab}[8]
+table <1> type tree dynamic
+group (default) {
+	block in quick from <1>
+}
+\end{verbatimtab}
+After that, we only need to manipulate the table with id 1 to change which packets are blocked:
+\begin{verbatimtab}[8]
+server# npfctl table 1 add 10.1.2.1/32
+server# npfctl table 1 add 10.1.1.0/24
+server# npfctl table 1 rem 10.1.3.0/24
+\end{verbatimtab}
+
+\subsection{Rule procedures}
+Rule procedures can be used to apply different transformations to packets matching a rule.
+There are two rule procedures currently implemented: logging and normalization.
+Example:
+\begin{verbatimtab}[8]
+procedure "log" {
+	log: npflog0
+}
+
+procedure "norm": {
+	normalise: "random-id"
+}
+group (default):
+	block in quick from <1> apply "log"
+\end{verbatimtab}
+To declare procedures, you have to specify the rule procedure's name and parameters, and give
+it a user defined procedure name. Then, in order to execute this procedure in a rule on the matching packet,
+you can use the apply keyword followed by the user-defined name.
+
+\section {Future}
+With NetBSD 6.0 NPF will get a much more wider exposure among users, which in turn will make the code base
+more mature; NPF implements what many would call basic requirements for a viable firewall. Currently, the
+most pressing matter impacting NPF is the single-threadedness of the networking code in NetBSD, but changing this
+would require a hug effort. Especically for this reason, funding has been offered for it \cite{smpfund}, sadly with no takers.
+NetBSD is participating in Google Summer of Code again, and NPF will be on the list of proposed student projects.
+Here's an incomplete list of things that could be done generally around NPF or the networking code, with no particular
+order regarding either the difficulty or the importance of the task:
+\begin{itemize}
+	\item CARP support
+	\item rate-limiting support
+	\item layer 7 filtering support
+	\item ALGs for common protocols (SIP for VoIP, FTP, IRC, ...)
+	\item more detailed statistics
+	\item Multi-queue NIC support with per-CPU queue bindings
+	\item On-NIC packet classification support
+\end{itemize}
+
+\bibliographystyle{plain}
+\bibliography{references}
+\end{document}
