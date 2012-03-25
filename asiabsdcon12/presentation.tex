@@ -5,6 +5,7 @@
 \usepackage{beamerthemeboxes}
 \PassOptionsToPackage{normalem}{ulem}
 \usepackage{ulem}
+\usepackage{moreverb}
 \usetheme{Madrid}
 \usepackage{tikz} 
 \usetikzlibrary{shapes}
@@ -127,9 +128,58 @@
 		\begin{itemize}
 			\item start, stop, reload, flush, stats, tables, sessions, ...
 		\end{itemize}
-	\item Rules will be compiled to a bytecode, and it will be loaded as ruleset(s)
-	\item Current parser will be replaced by a new one by Martin
+	\item Rules are translated into bytecode, and pushed down to the kernel
+	\item The parser has been recently rewritten by christos@ based on martin@'s code
 \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+\frametitle{Features - variables and groups}
+\begin{verbatim}
+ext_if = "wm0"
+int_if = "wm1"
+
+group (name "external", interface $ext_if) {
+    ...
+}
+
+group (name "internal", interface $int_if) {
+    ...
+}
+
+group (default) {
+    block all
+}
+\end{verbatim}
+\end{frame}
+
+\begin{frame}[fragile]
+\frametitle{Features - rule procedures}
+\begin{itemize}
+	\item Allows connection-based packet transformation
+\end{itemize}
+\begin{verbatim}
+procedure "rid" {
+    normalize (random-id)
+}
+
+procedure "log" {
+    log npflog0
+}
+\end{verbatim}
+\end{frame}
+
+\begin{frame}[fragile]
+\frametitle{Features - tables}
+\begin{verbatim}
+table "1" type tree dynamic
+table "2" type hash file "/etc/npf_backlist"
+
+group (default) {
+    block in quick from <1>
+    block out quick to <2>
+}
+\end{verbatim}
 \end{frame}
 
 \begin{frame}
@@ -152,7 +202,7 @@
 \begin{frame}[fragile,basicstyle=\ttfamily]
 \begin{verbatim}
 ext_if = "wm0"
-ext_if = "wm1"
+int_if = "wm1"
 table "1" type "tree" dynamic
 procedure "rid" { normalize (random-id) }
 procedure "log" { log npflog0 }
@@ -244,12 +294,8 @@ typedef struct {
 	\item Stateful NAT64 [RFC 6146]
 	\item IPv6-to-IPv6 Network Prefix Translation (NPTv6) [RFC 6296]
 \pause
-	\item Write more documentation :)
+	\item Write more documentation and bug-fix...
 \end{itemize}
-\end{frame}
-
-\begin{frame}
-\frametitle{Performance testing}
 \end{frame}
 
 \begin{frame}
@@ -261,6 +307,7 @@ Questions and answers?
 \begin{frame}
 \begin{center}
 Thank you!
+Arigatou gozaimashita!
 \end{center}
 \end{frame}
 
