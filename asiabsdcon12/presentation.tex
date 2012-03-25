@@ -21,13 +21,13 @@
 	    \usebeamerfont{author in head/foot}{Nagy Zoltán Arnold}~~
   \end{beamercolorbox}%
   \begin{beamercolorbox}[wd=.5\paperwidth,ht=2.25ex,dp=1ex,right]{date in head/foot}%
-    \usebeamerfont{date in head/foot}{AsiaBSDCon 2012}\hspace*{2em}
+    \usebeamerfont{date in head/foot}{AsiaBSDCon 2012, Tokyo, Japan}\hspace*{2em}
     \insertframenumber{} / \inserttotalframenumber\hspace*{2ex}
   \end{beamercolorbox}}%
   \vskip0pt%
 }
-
 \usebeamertemplate{mytheme}
+\beamertemplatenavigationsymbolsempty
 \date{}
 \begin{document}
 
@@ -47,10 +47,17 @@
 \pause
 	\begin{itemize}
 		\item boolean expression tree
-		\item directed acyclic control flow graph
+		\item directed acyclic control flow graph\footnote{The graph on the next page is taken from "The BSD Packet Filter: A New
+Architecture for User-level Packet Capture" by Steven McCanne and Van Jacobson}
 		\item if-then-else hell
 	\end{itemize}
 \end{itemize}
+\end{frame}
+
+\begin{frame}
+\begin{center}
+	\includegraphics[scale=.5]{cfg}
+\end{center}
 \end{frame}
 
 \begin{frame}
@@ -98,13 +105,14 @@
 		\begin{itemize}
 			\item committed to -current in November 2011
 		\end{itemize}
+	\item Something will happen in 2012 too :-)
 \end{itemize}
 \end{frame}
 
 \begin{frame}
 \frametitle{Motivations and goals}
 \begin{itemize}
-	\item There a few existing firewalls
+	\item There are a few existing firewalls
 	\item It's easier to design a new firewall from ground up than to clean up existing codebases
 	\item Design goals for NPF:
 	\begin{itemize}
@@ -135,6 +143,11 @@
 
 \begin{frame}[fragile]
 \frametitle{Features - variables and groups}
+\begin{itemize}
+	\item Each group has a name and an interface defined
+	\item If there's no deciding rule in the custom group, the default group's rules will be inspected
+	\item It's important to mark any deciding rule final ("quick")
+\end{itemize}
 \begin{verbatim}
 ext_if = "wm0"
 int_if = "wm1"
@@ -157,6 +170,8 @@ group (default) {
 \frametitle{Features - rule procedures}
 \begin{itemize}
 	\item Allows connection-based packet transformation
+	\item If made pluggable, would allow kernel modules to perform custom packet modifications
+	\item Currently 
 \end{itemize}
 \begin{verbatim}
 procedure "rid" {
@@ -180,6 +195,16 @@ group (default) {
     block out quick to <2>
 }
 \end{verbatim}
+\end{frame}
+
+\begin{frame}
+\frametitle{Features - Application Level Gateways}
+\begin{itemize}
+	\item Some protocols embed lower level information in their payload (think FTP's PORT, SIP, RTSP)
+	\item In order to dynamically handle these, we need to actually process the data
+	\item This is mostly important for NAT setups
+	\item Currently there's only one ALG implemented for ICMP (traceroute support)...
+\end{itemize}
 \end{frame}
 
 \begin{frame}
@@ -235,8 +260,8 @@ Efficient internal structures
 	\item npf\_addr (in6\_addr, 128-bit) for addresses (the first 32 bit is used for IPv4 addresses)
 	\item uint8\_t for masks
 	\begin{itemize}
-		\item instead of generating the appropriate npf\_addr value from  255.255.255.0 or /24, we just store
-the mask (<=128)
+		\item instead of generating the appropriate npf\_addr value from the netmask(255.255.255.0 or /24), we just store
+the mask
 		\item tradeoff: CPU for memory
 	\end{itemize}
 \end{itemize}
@@ -274,11 +299,11 @@ typedef struct {
 \end{frame}
 
 \begin{frame}
-\frametitle{Current TODO list}
+\frametitle{TODOs after the 6.0 release}
 \begin{itemize}
-	\item Replace red-black trees with Patricia (radix) trees for tables
+	\item Replace red-black trees with (lockless) Patricia (radix) trees for tables
 \pause
-	\item Pregenerate an array for masks
+	\item Pregenerate an array for masks, and allow run-time switching
 \pause
 	\item Support per-rule statistics
 \pause
@@ -294,7 +319,24 @@ typedef struct {
 	\item Stateful NAT64 [RFC 6146]
 	\item IPv6-to-IPv6 Network Prefix Translation (NPTv6) [RFC 6296]
 \pause
-	\item Write more documentation and bug-fix...
+	\item Port over to FreeBSD in order to prove our performance claims :-)
+\pause
+	\item Write more documentation and fix remaining bugs
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\frametitle{Additional ideas}
+\begin{itemize}
+	\item Spread the RX/TX queue processing on modern NICs across all cores
+\pause
+	\item Optimize the ruleset
+	\begin{itemize}
+		\item first step could be to prune the graph based on heuristics
+		\item then to compile it to actual machine code (JIT/LLVM/...)
+	\end{itemize}
+\pause
+	\item Make the network stack lockless, but this is a daunting task
 \end{itemize}
 \end{frame}
 
@@ -306,7 +348,6 @@ Questions and answers?
 
 \begin{frame}
 \begin{center}
-Thank you!
 Arigatou gozaimashita!
 \end{center}
 \end{frame}
